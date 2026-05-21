@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Текстове Серце</title>
+    <title>Ultimate Neon HeartBeat</title>
     <style>
         * {
             margin: 0;
@@ -11,131 +11,181 @@
             box-sizing: border-box;
         }
         body {
-            background-color: #000;
+            background: radial-gradient(circle at center, #11001c 0%, #05000d 60%, #000000 100%);
             overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            font-family: sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
         canvas {
             display: block;
+            opacity: 0;
+            transition: opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .center-text {
+        /* Ультра-стильна неонова кнопка */
+        #startBtn {
             position: absolute;
+            padding: 18px 45px;
+            font-size: 1.1rem;
+            font-weight: 600;
             color: #fff;
-            font-size: 3rem;
-            font-weight: bold;
-            pointer-events: none;
-            text-shadow: 0 0 20px rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 10;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+        #startBtn:hover {
+            transform: scale(1.04) translateY(-2px);
+            border-color: rgba(255, 44, 85, 0.6);
+            background: rgba(255, 44, 85, 0.05);
+            box-shadow: 0 15px 40px rgba(254, 44, 85, 0.25);
+        }
+        #startBtn:active {
+            transform: scale(0.98) translateY(0);
         }
     </style>
 </head>
 <body>
 
-    <div class="center-text">Love you.</div>
+    <button id="startBtn">Відкрити Серце</button>
     <canvas id="heartCanvas"></canvas>
+
+    <audio id="bgMusic" src="angel.mp3" loop></audio>
 
     <script>
         const canvas = document.getElementById('heartCanvas');
         const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const audio = document.getElementById('bgMusic');
 
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
         const particles = [];
+        const stars = [];
         const textToDisplay = "love you";
         
-        const mouse = {
-            x: null,
-            y: null,
-            radius: 60 // Радіус відштовхування
-        };
+        let audioCtx, analyser, dataArray;
+        let beatScale = 1; 
+        let bassPower = 0; // Рівень інтенсивності басу (0 до 1)
 
-        window.addEventListener('mousemove', (e) => {
-            mouse.x = e.x;
-            mouse.y = e.y;
-        });
+        const mouse = { x: null, y: null, radius: 75 };
 
-        window.addEventListener('mouseout', () => {
-            mouse.x = null;
-            mouse.y = null;
-        });
+        window.addEventListener('mousemove', (e) => { mouse.x = e.x; mouse.y = e.y; });
+        window.addEventListener('mouseout', () => { mouse.x = null; mouse.y = null; });
 
         class Particle {
             constructor(x, y, text) {
-                this.x = Math.random() * canvas.width; // Початкова випадкова позиція
+                this.x = Math.random() * canvas.width;
                 this.y = Math.random() * canvas.height;
-                this.baseX = x; // Цільова позиція у формі серця
+                this.baseX = x;
                 this.baseY = y;
                 this.text = text;
-                this.density = (Math.random() * 30) + 15; // Швидкість повернення
-                this.fontSize = Math.random() * 6 + 7; // Розмір тексту (7px - 13px)
-                this.color = `rgba(255, ${Math.floor(Math.random() * 50)}, ${Math.floor(Math.random() * 100 + 50)}, ${Math.random() * 0.5 + 0.5})`;
+                this.density = (Math.random() * 18) + 12;
+                this.fontSize = Math.random() * 3 + 9; // 9px - 12px
+                
+                // Передінстальовані відтінки для стабільного FPS (без обчислень у кадрі)
+                this.h = Math.floor(Math.random() * 15) + 340; // Спектр від малинового до червоного
+                this.s = Math.floor(Math.random() * 20) + 80;   // Висока насиченість
+                this.l = Math.floor(Math.random() * 20) + 50;   // Базова яскравість
+                this.alpha = (Math.random() * 0.4 + 0.5).toFixed(2);
             }
 
             draw() {
-                ctx.fillStyle = this.color;
-                ctx.font = `${this.fontSize}px Arial`;
+                // Динамічно змінюємо яскравість літер залежно від басу
+                let currentLight = Math.min(100, this.l + (bassPower * 25));
+                
+                ctx.fillStyle = `hsla(${this.h}, ${this.s}%, ${currentLight}%, ${this.alpha})`;
+                ctx.font = `${this.fontSize * (beatScale * 0.97)}px Arial`;
+                
+                // Додаємо неонове сяйво лише під час потужного басу (економить ресурси)
+                if (bassPower > 0.4) {
+                    ctx.shadowBlur = 12 * bassPower;
+                    ctx.shadowColor = `hsl(${this.h}, 100%, 60%)`;
+                }
+
                 ctx.fillText(this.text, this.x, this.y);
+                ctx.shadowBlur = 0; // Скидаємо відразу
             }
 
-            update() {
-                // Перевірка взаємодії з мишкою
+            update(centerX, centerY) {
+                let dxFromCenter = this.baseX - centerX;
+                let dyFromCenter = this.baseY - centerY;
+                
+                let targetX = centerX + dxFromCenter * beatScale;
+                let targetY = centerY + dyFromCenter * beatScale;
+
                 let dx = mouse.x - this.x;
                 let dy = mouse.y - this.y;
                 let distance = Math.sqrt(dx * dx + dy * dy);
-                let forceDirectionX = dx / distance;
-                let forceDirectionY = dy / distance;
-                
-                // Максимальна дистанція відштовхування
-                let maxDistance = mouse.radius;
-                let force = (maxDistance - distance) / maxDistance;
                 
                 if (distance < mouse.radius) {
-                    this.x -= forceDirectionX * force * 10;
-                    this.y -= forceDirectionY * force * 10;
+                    let forceDirectionX = dx / distance;
+                    let forceDirectionY = dy / distance;
+                    let force = (mouse.radius - distance) / mouse.radius;
+                    this.x -= forceDirectionX * force * 16;
+                    this.y -= forceDirectionY * force * 16;
                 } else {
-                    // Повернення на базу
-                    if (this.x !== this.baseX) {
-                        let dxBase = this.x - this.baseX;
-                        this.x -= dxBase / this.density;
-                    }
-                    if (this.y !== this.baseY) {
-                        let dyBase = this.y - this.baseY;
-                        this.y -= dyBase / this.density;
-                    }
+                    this.x -= (this.x - targetX) / this.density;
+                    this.y -= (this.y - targetY) / this.density;
                 }
             }
         }
 
-        // Математична формула серця (параметричні рівняння)
+        class Star {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 1.2;
+                this.baseAlpha = Math.random() * 0.4 + 0.1;
+                this.alpha = this.baseAlpha;
+            }
+
+            draw() {
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * (1 + bassPower * 0.5), 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            update() {
+                // Мерехтіння синхронно з музикою
+                this.alpha = Math.min(1, this.baseAlpha + bassPower * 0.4);
+            }
+        }
+
         function getHeartPoint(t, scale) {
             const x = 16 * Math.pow(Math.sin(t), 3);
             const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
-            return {
-                x: x * scale,
-                y: -y * scale // мінус, бо в canvas вісь Y йде вниз
-            };
+            return { x: x * scale, y: -y * scale };
         }
 
         function init() {
             particles.length = 0;
+            stars.length = 0;
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
-            
-            // Підбираємо масштаб залежно від екрану
-            const scale = Math.min(canvas.width, canvas.height) / 45; 
+            const scale = Math.min(canvas.width, canvas.height) / 44; 
 
-            // Генеруємо точки вздовж контуру та всередині серця
-            for (let t = 0; t < Math.PI * 2; t += 0.015) {
-                // Контур серця
+            for (let i = 0; i < 120; i++) {
+                stars.push(new Star());
+            }
+
+            // Оптимальний крок для щільності без просідання кадрів
+            for (let t = 0; t < Math.PI * 2; t += 0.035) {
                 let point = getHeartPoint(t, scale);
                 particles.push(new Particle(centerX + point.x, centerY + point.y, textToDisplay));
 
-                // Заповнення внутрішньої частини (випадкові точки всередині)
-                for (let j = 0; j < 5; j++) {
+                for (let j = 0; j < 2; j++) {
                     let r = Math.random();
                     let innerPoint = getHeartPoint(t, scale * r);
                     particles.push(new Particle(centerX + innerPoint.x, centerY + innerPoint.y, textToDisplay));
@@ -144,22 +194,77 @@
         }
 
         function animate() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Ефект плавного затухання хвостів (Motion blur)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.14)'; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            if (analyser) {
+                analyser.getByteFrequencyData(dataArray);
+                
+                // Massive Attack - Angel фокусується на перших 2-3 індексах частот (глибокий бас)
+                let bass = (dataArray[0] + dataArray[1] + dataArray[2]) / 3;
+                bassPower = bass / 255; 
+                
+                // Масштабування серця: від 1.0 (спокій) до 1.24 (пік басу)
+                beatScale = 1 + bassPower * 0.24; 
+            }
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            for (let i = 0; i < stars.length; i++) {
+                stars[i].update();
+                stars[i].draw();
+            }
+
             for (let i = 0; i < particles.length; i++) {
-                particles[i].update();
+                particles[i].update(centerX, centerY);
                 particles[i].draw();
             }
+
+            // Центральний неоновий текст
+            let textGlow = Math.floor(20 * bassPower);
+            if (textGlow > 2) {
+                ctx.shadowBlur = textGlow + 10;
+                ctx.shadowColor = 'rgba(255, 44, 85, 0.8)';
+            }
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.floor(46 * beatScale)}px -apple-system, BlinkMacSystemFont, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Love you.', centerX, centerY);
+            ctx.shadowBlur = 0; 
+
             requestAnimationFrame(animate);
         }
 
-        init();
-        animate();
+        startBtn.addEventListener('click', () => {
+            startBtn.style.display = 'none';
+            canvas.style.opacity = '1';
 
-        // Адаптивність при зміні розміру вікна
+            audio.play().catch(e => console.log("Audio play error:", e));
+
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            let src = audioCtx.createMediaElementSource(audio);
+            analyser = audioCtx.createAnalyser();
+            src.connect(analyser);
+            analyser.connect(audioCtx.destination);
+            
+            // Налаштування для ловлі басу
+            analyser.fftSize = 64; 
+            analyser.smoothingTimeConstant = 0.75; // Робить рух серця більш плавним та еластичним
+            
+            let bufferLength = analyser.frequencyBinCount;
+            dataArray = new Uint8Array(bufferLength);
+
+            init();
+            animate();
+        });
+
         window.addEventListener('resize', () => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            init();
+            if(audioCtx) init();
         });
     </script>
 </body>
