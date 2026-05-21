@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DARK ROMANCE // DETAILED SWORD & HEART</title>
+    <title>DARK ROMANCE // DIE FOR YOU</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -30,7 +30,6 @@
             transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* Сувора прямокутна кнопка без заокруглень */
         #startBtn {
             display: none;
             padding: 20px 50px;
@@ -47,7 +46,7 @@
             letter-spacing: 5px;
             text-transform: uppercase;
             opacity: 0;
-            margin-top: 270px; /* Чітко під рукояткою меча */
+            margin-top: 290px; /* Трохи нижче, щоб не перекривати ручку нахиленого меча */
         }
         #startBtn:hover { 
             transform: scale(1.03); 
@@ -61,10 +60,10 @@
     <canvas id="mainCanvas"></canvas>
     
     <div id="intro-screen">
-        <button id="startBtn">Open Your Heart</button>
+        <button id="startBtn">Die For You</button>
     </div>
 
-    <audio id="bgMusic" src="angel.mp3" loop preload="auto"></audio>
+    <audio id="bgMusic" src="die_for_you.mp3" loop preload="auto"></audio>
     <img id="heartImg" src="heart.jpg" style="display: none;" crossorigin="anonymous">
 
     <script>
@@ -92,15 +91,16 @@
         let centerX = canvas.width / 2;
         let centerY = canvas.height / 2;
         
-        // Початкові налаштування меча
-        let swordX = centerX;
-        let swordY = -350;
-        let swordSpeed = 3; 
-        let targetSwordY = centerY - 25; // Точка, де він пробиває центр серця
+        // Математика ДІАГОНАЛЬНОГО ПОЛІТУ (кут ~60 градусів)
+        const angle = Math.PI / 3; 
+        // Початкова точка далеко вгорі ліворуч
+        let swordDist = -500; 
+        let targetDist = -40; // Точка зупинки, щоб лезо пройшло наскрізь через центр
+        let swordSpeed = 4; 
         
         let swordIn = false;
         let textAlpha = 0; 
-        let heartAlpha = 0; // Поява силуету серця
+        let heartAlpha = 0; 
 
         let touchStartY = 0;
         let touchEndY = 0;
@@ -207,7 +207,6 @@
             particles.length = 0;
             const tempCanvas = document.createElement('canvas');
             const tempCtx = tempCanvas.getContext('2d');
-            
             const scanSize = isMobile ? 450 : 600; 
             tempCanvas.width = scanSize; tempCanvas.height = scanSize;
             
@@ -252,86 +251,79 @@
             ctx.restore();
         }
 
-        // ВЕРТИКАЛЬНЕ ІНТРО: ДЕТАЛІЗОВАНИЙ МЕЧ ВЛІТАЄ В ААНАТОМІЧНЕ СЕРЦЕ БЕЗ ІСКР
-        function drawVerticalSwordIntro() {
+        // НОВЕ ІНТРО: УЛ ТРА-ДЕТАЛІЗОВАНИЙ МЕЧ ПРОБИВАЄ НАПИС І СЕРЦЕ НАСКРІЗЬ
+        function drawDiagonalSwordIntro() {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // М'яка поява реального силуету твого серця з першої секунди
+            // Твоє реальне серце плавно горить на фоні з самого початку
             if (heartAlpha < 0.06) heartAlpha += 0.0015;
             ctx.save();
             ctx.globalAlpha = swordIn ? 0.09 : heartAlpha;
-            let imgW = isMobile ? 225 : 310; 
-            let imgH = isMobile ? 265 : 370;
+            let imgW = isMobile ? 220 : 300; let imgH = isMobile ? 260 : 360;
             ctx.drawImage(heartImg, centerX - imgW/2, centerY - imgH/2, imgW, imgH);
             ctx.restore();
 
-            if (textAlpha < 1 && swordY < centerY - 150) textAlpha += 0.03;
+            if (textAlpha < 1 && swordDist < -150) textAlpha += 0.03;
             drawAdvancedText(centerX, centerY, 1, textAlpha);
 
-            // Фізика прискорення руху клинка
-            if (swordY < targetSwordY) {
-                swordY += swordSpeed;
-                swordSpeed += 0.9; 
+            // Розрахунок руху по діагоналі з прискоренням
+            if (swordDist < targetDist) {
+                swordDist += swordSpeed;
+                swordSpeed += 0.8; 
             } else if (!swordIn) {
                 swordIn = true;
-                // Жодних іскр! Чистий, глибокий вхід меча в серце
+                // Чистий глибокий наскрізний вхід без іскр
                 startBtn.style.display = 'block';
                 setTimeout(() => { startBtn.style.opacity = '1'; }, 50);
             }
 
-            // МАЛЮВАННЯ ВИСОКОДЕТАЛІЗОВАНОГО МЕЧА КОДОМ
+            // Поточні координати меча на векторі нахилу
+            let currentX = centerX + swordDist * Math.cos(angle);
+            let currentY = centerY + swordDist * Math.sin(angle);
+
+            // МАЛЮВАННЯ УЛЬТРА-ДЕТАЛІЗОВАНОГО МЕЧА ПІД КУТОМ
             ctx.save();
             let swordScale = isMobile ? 0.75 : 1;
-            ctx.translate(centerX, swordY);
+            ctx.translate(currentX, currentY);
+            ctx.rotate(angle - Math.PI / 2); // Поворот за вектором руху
             ctx.scale(swordScale, swordScale);
-            
-            // Насичений неоновий контур всього меча
-            ctx.shadowBlur = 20; 
-            ctx.shadowColor = '#ff0015';
+            ctx.shadowBlur = 20; ctx.shadowColor = '#ff0015';
 
-            // 1. ЛЕЗО З РЕЛЬЄФНИМ ГРАДІЄНТОМ ТА РЕБРОМ ЖОРСТКОСТІ (Ромбоподібне)
-            ctx.fillStyle = '#ff0033'; 
-            ctx.fillRect(-6, -190, 12, 190); // Базовий силует леза
-            ctx.fillStyle = '#ffffff'; 
-            ctx.fillRect(-2, -190, 4, 190); // Центральне яскраве біле ребро меча
-            ctx.fillStyle = '#990011';
-            ctx.fillRect(-6, -190, 2, 190); // Тіні на гранях
-            ctx.fillRect(4, -190, 2, 190);
+            // 1. ДОВГЕ РОМБОПОДІБНЕ ЛЕЗО (Проходить наскрізь, довжина збільшена до 250px)
+            ctx.fillStyle = '#ff0033'; ctx.fillRect(-6, -210, 12, 250); 
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(-1.5, -210, 3, 250); // Біле центральне ребро жорсткості
+            ctx.fillStyle = '#990011'; ctx.fillRect(-6, -210, 2, 250); // Грані тіні
+            ctx.fillRect(4, -210, 2, 250);
 
-            // Вістря меча (гострий трикутник донизу)
+            // Гостре довге вістрі клинка на кінці
             ctx.beginPath();
-            ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.lineTo(0, 12);
+            ctx.moveTo(-6, 40); ctx.lineTo(6, 40); ctx.lineTo(0, 58);
             ctx.closePath();
             ctx.fillStyle = '#ff0033'; ctx.fill();
             ctx.beginPath();
-            ctx.moveTo(-2, 0); ctx.lineTo(2, 0); ctx.lineTo(0, 12);
+            ctx.moveTo(-1.5, 40); ctx.lineTo(1.5, 40); ctx.lineTo(0, 58);
             ctx.closePath();
             ctx.fillStyle = '#ffffff'; ctx.fill();
 
-            // 2. ФІГУРНА ДЕТАЛІЗОВАНА ГАРДА (Хрестовина з гострими загнутими кутами)
-            ctx.fillStyle = '#ff0022';
-            ctx.fillRect(-38, -190, 76, 7); // Основа хрестовини
-            // Гострі бічні зубці гарди
-            ctx.fillRect(-38, -195, 6, 12);
-            ctx.fillRect(32, -195, 6, 12);
+            // 2. СКЛАДНА ГОТИЧНА ГАРДА (Хрестовина з рельєфом)
+            ctx.fillStyle = '#ff0022'; ctx.fillRect(-40, -210, 80, 8); 
+            ctx.fillRect(-40, -216, 6, 14); // Гострі кути гарди, направлені вперед
+            ctx.fillRect(34, -216, 6, 14);
 
-            // 3. РУКОЯТКА ТА ОБ'ЄМНЕ НАВЕРШЯ (Повністю закрита брутальна форма)
-            ctx.fillStyle = '#ffffff'; 
-            ctx.fillRect(-3, -225, 6, 35); // Тіло рукоятки
+            // 3. РУКОЯТКА ТА ТРАПЕЦІЄПОДІБНЕ НАВЕРШЯ
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(-3, -248, 6, 38); 
             ctx.fillStyle = '#ff0033';
-            ctx.fillRect(-4, -205, 8, 3);  // Декоративні кільця на ручці
-            ctx.fillRect(-4, -217, 8, 3);
+            ctx.fillRect(-4.5, -225, 9, 3); // Кільця обхвату
+            ctx.fillRect(-4.5, -238, 9, 3);
 
-            // Навершя (Об'ємна гостра трапеція вгорі)
+            // Навершя (Масивне гостре закінчення меча)
             ctx.fillStyle = '#ff0022';
             ctx.beginPath();
-            ctx.moveTo(-8, -225); ctx.lineTo(8, -225);
-            ctx.lineTo(12, -235); ctx.lineTo(-12, -235);
-            ctx.closePath();
-            ctx.fill();
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(-3, -233, 6, 6); // Біле ядро всередині навершя
+            ctx.moveTo(-9, -248); ctx.lineTo(9, -248);
+            ctx.lineTo(14, -260); ctx.lineTo(-14, -260);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(-3, -257, 6, 6);
 
             ctx.restore();
 
@@ -352,7 +344,7 @@
 
         function animate() {
             if (!swordIn || (swordIn && !isPlaying)) {
-                drawVerticalSwordIntro();
+                drawDiagonalSwordIntro();
             } else {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.22)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -407,7 +399,7 @@
             isPlaying = false; isMusicPaused = false;
             audio.pause(); audio.currentTime = 0; audioWaves.length = 0;
             
-            swordY = -350; swordSpeed = 3; swordIn = false;
+            swordDist = -500; swordSpeed = 4; swordIn = false;
             textAlpha = 0; heartAlpha = 0;
             startBtn.style.display = 'none'; startBtn.style.opacity = '0';
 
@@ -421,8 +413,6 @@
             canvas.width = window.innerWidth; canvas.height = window.innerHeight;
             centerX = canvas.width / 2; centerY = canvas.height / 2;
             mouse.radius = isMobile ? 50 : 65;
-            if(!swordIn) { swordX = centerX; swordY = -350; swordSpeed = 3; }
-            targetSwordY = centerY - 25;
             if(isPlaying) scanHeartImage();
         });
     </script>
