@@ -3,13 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SYSTEM FAILURE // CRITICAL ERROR</title>
+    <title>DARK ROMANCE // THE SWORD</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             background: #000;
             overflow: hidden;
@@ -17,307 +13,381 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            font-family: 'Courier New', Courier, monospace;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            user-select: none;
         }
-        canvas {
-            display: block;
-            opacity: 0;
-            transition: opacity 2s ease;
-            position: absolute;
-        }
+        canvas { display: block; position: absolute; top: 0; left: 0; }
         
-        /* Екран критичної помилки */
-        #error-screen {
+        #intro-screen {
             position: absolute;
-            width: 100%;
-            height: 100%;
-            background: #0d0000; /* Темно-червоний відтінок жаху */
-            padding: 30px;
-            color: #ff3333;
-            font-size: 1.1rem;
+            width: 100%; height: 100%;
+            background: #000;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 20;
-            text-align: center;
-            text-shadow: 0 0 10px #ff0000;
+            transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .glitch-title {
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin-bottom: 20px;
-            text-transform: uppercase;
-            animation: pulseError 1s infinite alternate;
-        }
-
-        .error-logs {
-            max-width: 600px;
-            text-align: left;
-            font-size: 1rem;
-            margin-bottom: 30px;
-            color: #ff6666;
-            opacity: 0.8;
-        }
-
-        @keyframes pulseError {
-            0% { transform: scale(1); opacity: 0.9; text-shadow: 0 0 10px #ff0000; }
-            100% { transform: scale(1.02); opacity: 1; text-shadow: 0 0 25px #ff0000, 0 0 5px #fff; }
-        }
-
-        /* Стильна червона кнопка аварійного перезапуску */
+        /* Сувора прямокутна кнопка без заокруглень */
         #startBtn {
             display: none;
-            padding: 18px 45px;
-            font-family: sans-serif;
+            padding: 22px 60px;
             font-size: 1.1rem;
             font-weight: bold;
-            color: #ff3333;
-            background: rgba(255, 0, 0, 0.05);
-            backdrop-filter: blur(10px);
-            border: 2px solid #ff3333;
-            border-radius: 4px;
-            cursor: pointer;
-            box-shadow: 0 0 20px rgba(255, 0, 0, 0.4);
-            transition: all 0.3s ease;
-            z-index: 30;
-            letter-spacing: 2px;
+            color: #ffffff; 
+            background: rgba(150, 0, 10, 0.08);
+            border: 2px solid #ff0015;
+            border-radius: 0px; 
+            cursor: pointer; 
+            box-shadow: 0 0 20px rgba(255, 0, 21, 0.3);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 30; 
+            letter-spacing: 5px;
             text-transform: uppercase;
+            opacity: 0;
+            margin-top: 250px; /* Опускаємо під рукоятку меча */
         }
-        #startBtn:hover {
-            transform: scale(1.05);
-            color: #fff;
-            background: #ff3333;
-            box-shadow: 0 0 40px #ff0000;
+        #startBtn:hover { 
+            transform: scale(1.03); 
+            background: #ff0015;
+            box-shadow: 0 0 45px #ff0015, inset 0 0 15px rgba(255,255,255,0.3);
         }
     </style>
 </head>
 <body>
 
-    <div id="error-screen">
-        <div class="glitch-title">⚠️ CRITICAL_SYSTEM_FAILURE ⚠️</div>
-        <div class="error-logs" id="log-container">
-            </div>
-        <button id="startBtn">OVERRIDE SYSTEM</button>
+    <canvas id="mainCanvas"></canvas>
+    
+    <div id="intro-screen">
+        <button id="startBtn">Open Your Heart</button>
     </div>
 
-    <canvas id="heartCanvas"></canvas>
-
-    <audio id="bgMusic" src="angel.mp3" loop></audio>
+    <audio id="bgMusic" src="angel.mp3" loop preload="auto"></audio>
+    <img id="heartImg" src="heart.jpg" style="display: none;" crossorigin="anonymous">
 
     <script>
-        const canvas = document.getElementById('heartCanvas');
+        const canvas = document.getElementById('mainCanvas');
         const ctx = canvas.getContext('2d');
         const startBtn = document.getElementById('startBtn');
-        const errorScreen = document.getElementById('error-screen');
-        const logContainer = document.getElementById('log-container');
+        const introScreen = document.getElementById('intro-screen');
         const audio = document.getElementById('bgMusic');
+        const heartImg = document.getElementById('heartImg');
 
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
         const particles = [];
-        const stars = [];
+        const audioWaves = [];
         const textToDisplay = "love you";
         
-        let audioCtx, analyser, dataArray;
+        let audioCtx, analyser, dataArray, animationFrameId;
         let beatScale = 1; 
         let bassPower = 0;
+        let isPlaying = false;
+        
+        // Змінні для анімації меча
+        let swordY = -200;
+        let targetSwordY = canvas.height / 2 - 40;
+        let swordIn = false;
+        let sparkParticles = [];
 
-        const mouse = { x: null, y: null, radius: 75 };
+        const mouse = { x: null, y: null, radius: 65 };
         window.addEventListener('mousemove', (e) => { mouse.x = e.x; mouse.y = e.y; });
         window.addEventListener('mouseout', () => { mouse.x = null; mouse.y = null; });
 
-        // Симуляція збою системи
-        const errorLines = [
-            "[ERROR] Memory leak detected at block 0x7FFF4A2C",
-            "[WARNING] Core temperature exceeding emotional limits...",
-            "[FATAL] Connection to rational_logic.dll severed.",
-            "[ERROR] Security breach: Core infected by affection_virus.exe",
-            "[INFO] Attempting to isolate infected sectors...",
-            "[FATAL] Isolation FAILED. Virus rewriting main interface.",
-            "[SYSTEM] Total collapse imminent. Only one backup module active.",
-            "------------------------------------------------------------",
-            "[READY] Emergency manual reboot available."
-        ];
-
-        let lineIndex = 0;
-        function showErrors() {
-            if (lineIndex < errorLines.length) {
-                const p = document.createElement('p');
-                p.textContent = errorLines[lineIndex];
-                logContainer.appendChild(p);
-                lineIndex++;
-                setTimeout(showErrors, 350); // Швидкість випадіння помилок
-            } else {
-                setTimeout(() => {
-                    startBtn.style.display = 'block';
-                }, 400);
-            }
-        }
-
-        window.onload = showErrors;
-
-        // Код серця та частинок
         class Particle {
-            constructor(x, y, text) {
+            constructor(x, y, text, color) {
                 this.x = Math.random() * canvas.width;
                 this.y = Math.random() * canvas.height;
-                this.baseX = x;
-                this.baseY = y;
+                this.baseX = x; 
+                this.baseY = y; 
                 this.text = text;
-                this.density = (Math.random() * 18) + 12;
-                this.fontSize = Math.random() * 3 + 9;
-                this.h = Math.floor(Math.random() * 15) + 340; 
-                this.s = Math.floor(Math.random() * 20) + 80;   
-                this.l = Math.floor(Math.random() * 20) + 50;   
-                this.alpha = (Math.random() * 0.4 + 0.5).toFixed(2);
+                this.density = (Math.random() * 8) + 12;
+                this.fontSize = (Math.random() * 3 + 8) | 0;
+                this.color = color;
+                this.flash = 0;
             }
 
             draw() {
-                let currentLight = Math.min(100, this.l + (bassPower * 25));
-                ctx.fillStyle = `hsla(${this.h}, ${this.s}%, ${currentLight}%, ${this.alpha})`;
-                ctx.font = `${this.fontSize * (beatScale * 0.97)}px Arial`;
-                
-                if (bassPower > 0.4) {
-                    ctx.shadowBlur = 12 * bassPower;
-                    ctx.shadowColor = `hsl(${this.h}, 100%, 60%)`;
+                let finalColor = this.color;
+
+                if (mouse.x !== null) {
+                    let dx = mouse.x - this.x;
+                    let dy = mouse.y - this.y;
+                    if (dx*dx + dy*dy < 4225) { 
+                        this.flash = 12;
+                    }
                 }
-                ctx.fillText(this.text, this.x, this.y);
+
+                if (this.flash > 0) {
+                    finalColor = `rgba(255, 200, 200, 0.8)`; 
+                    ctx.shadowBlur = this.flash;
+                    ctx.shadowColor = '#ff3355';
+                    this.flash -= 0.8;
+                } else if (bassPower > 0.4) {
+                    ctx.shadowBlur = (8 * bassPower) | 0;
+                    ctx.shadowColor = '#ff0033';
+                }
+
+                ctx.fillStyle = finalColor;
+                ctx.font = `bold ${this.fontSize}px Arial`; 
+                ctx.fillText(this.text, this.x | 0, this.y | 0);
                 ctx.shadowBlur = 0;
             }
 
             update(centerX, centerY) {
-                let dxFromCenter = this.baseX - centerX;
-                let dyFromCenter = this.baseY - centerY;
-                let targetX = centerX + dxFromCenter * beatScale;
-                let targetY = centerY + dyFromCenter * beatScale;
+                let targetX = centerX + (this.baseX - centerX) * beatScale;
+                let targetY = centerY + (this.baseY - centerY) * beatScale;
 
-                let dx = mouse.x - this.x;
-                let dy = mouse.y - this.y;
-                let distance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (distance < mouse.radius) {
-                    let forceDirectionX = dx / distance;
-                    let forceDirectionY = dy / distance;
-                    let force = (mouse.radius - distance) / mouse.radius;
-                    this.x -= forceDirectionX * force * 16;
-                    this.y -= forceDirectionY * force * 16;
-                } else {
-                    this.x -= (this.x - targetX) / this.density;
-                    this.y -= (this.y - targetY) / this.density;
-                }
+                this.x -= (this.x - targetX) / this.density;
+                this.y -= (this.y - targetY) / this.density;
             }
         }
 
-        class Star {
-            constructor() {
-                this.x = Math.random() * canvas.width;
-                this.y = Math.random() * canvas.height;
-                this.size = Math.random() * 1.2;
-                this.baseAlpha = Math.random() * 0.4 + 0.1;
-                this.alpha = this.baseAlpha;
-            }
-            draw() {
-                ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * (1 + bassPower * 0.5), 0, Math.PI * 2);
-                ctx.fill();
-            }
-            update() { this.alpha = Math.min(1, this.baseAlpha + bassPower * 0.4); }
-        }
-
-        function getHeartPoint(t, scale) {
-            const x = 16 * Math.pow(Math.sin(t), 3);
-            const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
-            return { x: x * scale, y: -y * scale };
-        }
-
-        function init() {
+        function scanHeartImage() {
             particles.length = 0;
-            stars.length = 0;
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            const scanSize = 600; 
+            tempCanvas.width = scanSize;
+            tempCanvas.height = scanSize;
+            
+            tempCtx.drawImage(heartImg, 0, 0, scanSize, scanSize);
+            const imgData = tempCtx.getImageData(0, 0, scanSize, scanSize).data;
+            
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
-            const scale = Math.min(canvas.width, canvas.height) / 44; 
+            
+            const scale = Math.min(canvas.width, canvas.height) / scanSize * 0.95;
+            const step = 4; 
 
-            for (let i = 0; i < 120; i++) stars.push(new Star());
-
-            for (let t = 0; t < Math.PI * 2; t += 0.035) {
-                let point = getHeartPoint(t, scale);
-                particles.push(new Particle(centerX + point.x, centerY + point.y, textToDisplay));
-                for (let j = 0; j < 2; j++) {
-                    let r = Math.random();
-                    let innerPoint = getHeartPoint(t, scale * r);
-                    particles.push(new Particle(centerX + innerPoint.x, centerY + innerPoint.y, textToDisplay));
+            for (let y = 0; y < scanSize; y += step) {
+                for (let x = 0; x < scanSize; x += step) {
+                    const index = (y * scanSize + x) * 4;
+                    const r = imgData[index];
+                    const g = imgData[index + 1];
+                    const b = imgData[index + 2];
+                    
+                    if (r > 35 && r > g * 1.25 && r > b * 1.25) {
+                        const posX = centerX + (x - scanSize / 2) * scale;
+                        const posY = centerY + (y - scanSize / 2) * scale * 1.25;
+                        
+                        const colorString = `rgb(${r},${Math.max(0, g-25)},${Math.max(0, b-25)})`;
+                        particles.push(new Particle(posX, posY, textToDisplay, colorString));
+                    }
                 }
+            }
+        }
+
+        function drawAdvancedText(centerX, centerY) {
+            ctx.save();
+            ctx.textAlign = 'center'; 
+            ctx.textBaseline = 'middle';
+            let size = Math.floor(46 * beatScale);
+            
+            if (bassPower > 0.5) {
+                ctx.fillStyle = `rgba(255, 0, 50, ${bassPower * 0.35})`;
+                ctx.font = `italic bold ${size + Math.floor(25 * bassPower)}px sans-serif`;
+                ctx.shadowBlur = 30 * bassPower;
+                ctx.shadowColor = '#ff0033';
+                ctx.fillText('Love you.', centerX, centerY);
+            }
+            
+            ctx.shadowBlur = (15 * beatScale) | 0;
+            ctx.shadowColor = 'rgba(255, 0, 30, 0.8)';
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${size}px sans-serif`;
+            ctx.letterSpacing = "2px"; 
+            ctx.fillText('Love you.', centerX, centerY);
+            ctx.restore();
+        }
+
+        // НОВА ЕПІЧНА АНІМАЦІЯ МЕЧА НА ПОЧАТКУ
+        function drawSwordIntro(centerX, centerY) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Малюємо дуже тьмяний червоний силует серця на фоні підказкою
+            ctx.save();
+            ctx.globalAlpha = 0.04;
+            ctx.drawImage(heartImg, centerX - 150, centerY - 180, 300, 360);
+            ctx.restore();
+
+            // Рух меча вниз
+            if (swordY < targetSwordY) {
+                swordY += 12; // Швидкість падіння клинка
+            } else if (!swordIn) {
+                swordIn = true;
+                // Створюємо іскри при ударі в серце
+                for(let i=0; i<40; i++) {
+                    sparkParticles.push({
+                        x: centerX,
+                        y: centerY,
+                        vx: (Math.random() - 0.5) * 10,
+                        vy: (Math.random() - 0.5) * 10 - 2,
+                        size: Math.random() * 3 + 1,
+                        alpha: 1
+                    });
+                }
+                // Показуємо брутальну кнопку
+                startBtn.style.display = 'block';
+                setTimeout(() => { startBtn.style.opacity = '1'; }, 100);
+            }
+
+            // Малювання іскор
+            ctx.save();
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ff0011';
+            for(let i = sparkParticles.length - 1; i >= 0; i--) {
+                let p = sparkParticles[i];
+                p.x += p.vx; p.y += p.vy; p.alpha -= 0.02;
+                if(p.alpha <= 0) { sparkParticles.splice(i, 1); continue; }
+                ctx.fillStyle = `rgba(255, 50, 50, ${p.alpha})`;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+            }
+            ctx.restore();
+
+            // МАЛЮВАННЯ НЕОНОВОГО МЕЧА
+            ctx.save();
+            ctx.translate(centerX, swordY);
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#ff0022';
+
+            // Лезо меча (червоний неоновий лазер)
+            ctx.fillStyle = '#ffffff'; // Серцевина клинка біла для яскравості
+            ctx.fillRect(-3, -180, 6, 180);
+            ctx.fillStyle = '#ff0033'; // Неоновий контур леза
+            ctx.fillRect(-5, -180, 2, 180);
+            ctx.fillRect(3, -180, 2, 180);
+
+            // Гарда (хрестовина меча з гострими кутами)
+            ctx.fillStyle = '#ff0022';
+            ctx.fillRect(-35, -180, 70, 6);
+            
+            // Рукоятка та навершя меча
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(-2, -215, 4, 35);
+            ctx.fillRect(-6, -223, 12, 8); // Чіткі гострі кути навершя
+
+            ctx.restore();
+        }
+
+        function handleBackgroundWaves(centerX, centerY) {
+            if (bassPower > 0.65 && Math.random() > 0.75) {
+                audioWaves.push({ radius: 10, maxRadius: Math.min(canvas.width, canvas.height) * 0.85, opacity: 0.15 });
+            }
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = 'rgba(200, 0, 15, 0.15)';
+            for (let i = audioWaves.length - 1; i >= 0; i--) {
+                let w = audioWaves[i];
+                w.radius += 4 + (bassPower * 5); w.opacity -= 0.003; 
+                if (w.opacity <= 0 || w.radius >= w.maxRadius) { audioWaves.splice(i, 1); continue; }
+                ctx.beginPath(); ctx.arc(centerX, centerY, w.radius, 0, Math.PI * 2); ctx.stroke();
             }
         }
 
         function animate() {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.14)'; 
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            if (analyser) {
-                analyser.getByteFrequencyData(dataArray);
-                let bass = (dataArray[0] + dataArray[1] + dataArray[2]) / 3;
-                bassPower = bass / 255; 
-                beatScale = 1 + bassPower * 0.24; 
-            }
-
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
 
-            for (let i = 0; i < stars.length; i++) {
-                stars[i].update();
-                stars[i].draw();
-            }
-            for (let i = 0; i < particles.length; i++) {
-                particles[i].update(centerX, centerY);
-                particles[i].draw();
+            if (!isPlaying) {
+                drawSwordIntro(centerX, centerY);
+            } else {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.22)'; 
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                if (analyser) {
+                    analyser.getByteFrequencyData(dataArray);
+                    let bass = (dataArray[0] + dataArray[1] + dataArray[2]) / 3;
+                    bassPower = bass / 255; 
+                    beatScale = 1 + bassPower * 0.14; 
+                }
+
+                let gradient = ctx.createRadialGradient(centerX, centerY, 10, centerX, centerY, Math.min(canvas.width, canvas.height) * 0.55);
+                gradient.addColorStop(0, `rgba(55, 0, 5, ${bassPower * 0.15})`);
+                gradient.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                handleBackgroundWaves(centerX, centerY);
+
+                const len = particles.length;
+                for (let i = 0; i < len; i++) {
+                    particles[i].update(centerX, centerY);
+                    particles[i].draw();
+                }
+
+                drawAdvancedText(centerX, centerY);
             }
 
-            let textGlow = Math.floor(20 * bassPower);
-            if (textGlow > 2) {
-                ctx.shadowBlur = textGlow + 10;
-                ctx.shadowColor = 'rgba(255, 44, 85, 0.8)';
-            }
-            ctx.fillStyle = '#ffffff';
-            ctx.font = `bold ${Math.floor(46 * beatScale)}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('Love you.', centerX, centerY);
-            ctx.shadowBlur = 0; 
-
-            requestAnimationFrame(animate);
+            animationFrameId = requestAnimationFrame(animate);
         }
 
+        animate();
+
         startBtn.addEventListener('click', () => {
-            errorScreen.style.display = 'none';
-            canvas.style.opacity = '1';
-            document.body.style.background = "radial-gradient(circle at center, #11001c 0%, #05000d 60%, #000000 100%)";
-
-            audio.play().catch(e => console.log("Audio play blocked:", e));
-
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            let src = audioCtx.createMediaElementSource(audio);
-            analyser = audioCtx.createAnalyser();
-            src.connect(analyser);
-            analyser.connect(audioCtx.destination);
-            analyser.fftSize = 64; 
-            analyser.smoothingTimeConstant = 0.75; 
+            introScreen.style.opacity = '0';
+            setTimeout(() => { introScreen.style.display = 'none'; }, 1000);
             
-            let bufferLength = analyser.frequencyBinCount;
-            dataArray = new Uint8Array(bufferLength);
+            document.body.style.background = "radial-gradient(circle at center, #0e0002 0%, #030000 75%, #000000 100%)";
 
-            init();
-            animate();
+            audio.play().then(() => {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    let src = audioCtx.createMediaElementSource(audio);
+                    analyser = audioCtx.createAnalyser();
+                    src.connect(analyser);
+                    analyser.connect(audioCtx.destination);
+                    analyser.fftSize = 64; 
+                    analyser.smoothingTimeConstant = 0.75; 
+                    dataArray = new Uint8Array(analyser.frequencyBinCount);
+                }
+            }).catch(e => console.log("Muted", e));
+
+            isPlaying = true;
+            scanHeartImage(); 
         });
+
+        // Потрійний клік для повернення
+        let clickCount = 0;
+        let clickTimer;
+        window.addEventListener('click', (e) => {
+            if (!isPlaying || e.target === startBtn) return;
+            clickCount++;
+            if (clickCount === 1) {
+                clickTimer = setTimeout(() => { clickCount = 0; }, 400); 
+            } else if (clickCount === 3) {
+                clearTimeout(clickTimer);
+                clickCount = 0;
+                resetToStrictStart();
+            }
+        });
+
+        function resetToStrictStart() {
+            isPlaying = false;
+            audio.pause();
+            audio.currentTime = 0;
+            audioWaves.length = 0;
+            
+            // Скидаємо меч
+            swordY = -200;
+            swordIn = false;
+            sparkParticles = [];
+            startBtn.style.display = 'none';
+            startBtn.style.opacity = '0';
+
+            document.body.style.background = "#000";
+            introScreen.style.display = 'flex';
+            setTimeout(() => { introScreen.style.opacity = '1'; }, 50);
+        }
 
         window.addEventListener('resize', () => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            if(audioCtx) init();
+            targetSwordY = canvas.height / 2 - 40;
+            if(isPlaying) scanHeartImage();
         });
     </script>
 </body>
