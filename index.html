@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DARK ROMANCE // PERFORMANCE VERTICAL</title>
+    <title>DARK ROMANCE // DETAILED SWORD & HEART</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -15,14 +15,14 @@
             height: 100vh;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             user-select: none;
-            touch-action: none; /* Запобігає системним зумам на телефонах */
+            touch-action: none;
         }
         canvas { display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
         
         #intro-screen {
             position: absolute;
             width: 100%; height: 100%;
-            background: #000;
+            background: transparent; 
             display: flex;
             justify-content: center;
             align-items: center;
@@ -37,7 +37,7 @@
             font-size: 1rem;
             font-weight: bold;
             color: #ffffff; 
-            background: rgba(150, 0, 10, 0.08);
+            background: rgba(150, 0, 10, 0.15);
             border: 2px solid #ff0015;
             border-radius: 0px; 
             cursor: pointer; 
@@ -47,16 +47,12 @@
             letter-spacing: 5px;
             text-transform: uppercase;
             opacity: 0;
-            margin-top: 260px; /* Чітко під рукояткою встромленого меча */
+            margin-top: 270px; /* Чітко під рукояткою меча */
         }
-        
-        /* Мобільні відступи для кнопки */
-        @media (max-width: 768px) {
-            #startBtn {
-                padding: 16px 40px;
-                font-size: 0.9rem;
-                margin-top: 200px; /* Трохи вище на малих екранах */
-            }
+        #startBtn:hover { 
+            transform: scale(1.03); 
+            background: #ff0015;
+            box-shadow: 0 0 45px #ff0015, inset 0 0 15px rgba(255,255,255,0.3);
         }
     </style>
 </head>
@@ -79,7 +75,6 @@
         const audio = document.getElementById('bgMusic');
         const heartImg = document.getElementById('heartImg');
 
-        // Базове налаштування екрана
         let isMobile = window.innerWidth < 768;
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -92,21 +87,26 @@
         let beatScale = 1; 
         let bassPower = 0;
         let isPlaying = false;
+        let isMusicPaused = false;
         
-        // Координати центру екрана
         let centerX = canvas.width / 2;
         let centerY = canvas.height / 2;
         
-        // Вертикальний меч (падає строго згори вниз за координатами X)
+        // Початкові налаштування меча
         let swordX = centerX;
-        let swordY = -250;
-        let targetSwordY = centerY - 30;
+        let swordY = -350;
+        let swordSpeed = 3; 
+        let targetSwordY = centerY - 25; // Точка, де він пробиває центр серця
         
         let swordIn = false;
-        let sparkParticles = [];
         let textAlpha = 0; 
+        let heartAlpha = 0; // Поява силуету серця
 
-        // Налаштування тач/мишки
+        let touchStartY = 0;
+        let touchEndY = 0;
+        let clickCount = 0;
+        let clickTimer;
+
         const mouse = { x: null, y: null, radius: isMobile ? 50 : 65 };
         
         const updateMouse = (x, y) => { mouse.x = x; mouse.y = y; };
@@ -117,6 +117,46 @@
         window.addEventListener('touchmove', (e) => updateMouse(e.touches[0].clientX, e.touches[0].clientY));
         window.addEventListener('touchend', resetMouse);
 
+        window.addEventListener('touchstart', (e) => { touchStartY = e.touches[0].clientY; });
+        window.addEventListener('mousedown', (e) => { touchStartY = e.clientY; });
+
+        window.addEventListener('touchend', (e) => {
+            touchEndY = e.changedTouches[0].clientY;
+            if (!checkSwipeDown()) handleTripleClick(e);
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            touchEndY = e.clientY;
+            if (!checkSwipeDown()) handleTripleClick(e);
+        });
+
+        function checkSwipeDown() {
+            if (!isPlaying) return false;
+            if (touchEndY - touchStartY > 120) {
+                resetToStrictStart();
+                return true;
+            }
+            return false;
+        }
+
+        function handleTripleClick(e) {
+            if (!isPlaying || e.target === startBtn) return;
+            clickCount++;
+            if (clickCount === 1) {
+                clickTimer = setTimeout(() => { clickCount = 0; }, 400); 
+            } else if (clickCount === 3) {
+                clearTimeout(clickTimer);
+                clickCount = 0;
+                if (isMusicPaused) {
+                    audio.play().catch(e => console.log(e));
+                    isMusicPaused = false;
+                } else {
+                    audio.pause();
+                    isMusicPaused = true;
+                }
+            }
+        }
+
         class Particle {
             constructor(x, y, text, color) {
                 this.x = Math.random() * canvas.width;
@@ -125,7 +165,6 @@
                 this.baseY = y; 
                 this.text = text;
                 this.density = (Math.random() * 8) + 12;
-                // На мобільних шрифт робимо трішки меншим, щоб судини не зливалися
                 this.fontSize = ((Math.random() * 3 + (isMobile ? 7 : 8))) | 0;
                 this.color = color;
                 this.flash = 0;
@@ -137,20 +176,16 @@
                 if (mouse.x !== null) {
                     let dx = mouse.x - this.x;
                     let dy = mouse.y - this.y;
-                    let rSq = isMobile ? 2500 : 4225; // 50^2 або 65^2
-                    if (dx*dx + dy*dy < rSq) { 
-                        this.flash = 12;
-                    }
+                    let rSq = isMobile ? 2500 : 4225;
+                    if (dx*dx + dy*dy < rSq) this.flash = 12;
                 }
 
                 if (this.flash > 0) {
                     finalColor = `rgba(255, 200, 200, 0.8)`; 
-                    ctx.shadowBlur = this.flash;
-                    ctx.shadowColor = '#ff3355';
+                    ctx.shadowBlur = this.flash; ctx.shadowColor = '#ff3355';
                     this.flash -= 0.8;
                 } else if (bassPower > 0.4) {
-                    ctx.shadowBlur = (8 * bassPower) | 0;
-                    ctx.shadowColor = '#ff0033';
+                    ctx.shadowBlur = (8 * bassPower) | 0; ctx.shadowColor = '#ff0033';
                 }
 
                 ctx.fillStyle = finalColor;
@@ -173,30 +208,23 @@
             const tempCanvas = document.createElement('canvas');
             const tempCtx = tempCanvas.getContext('2d');
             
-            // На мобільних скануємо матрицю меншого розміру для супер-оптимізації процесора
             const scanSize = isMobile ? 450 : 600; 
-            tempCanvas.width = scanSize;
-            tempCanvas.height = scanSize;
+            tempCanvas.width = scanSize; tempCanvas.height = scanSize;
             
             tempCtx.drawImage(heartImg, 0, 0, scanSize, scanSize);
             const imgData = tempCtx.getImageData(0, 0, scanSize, scanSize).data;
             
-            // Адаптивний коефіцієнт масштабу під розмір екрана смартфона/ПК
             const scale = Math.min(canvas.width, canvas.height) / scanSize * (isMobile ? 0.85 : 0.95);
-            // Крок сканування: 5 для телефонів (менше точок), 4 для ПК (вища щільність)
             const step = isMobile ? 5 : 4; 
 
             for (let y = 0; y < scanSize; y += step) {
                 for (let x = 0; x < scanSize; x += step) {
                     const index = (y * scanSize + x) * 4;
                     const r = imgData[index];
-                    const g = imgData[index + 1];
-                    const b = imgData[index + 2];
-                    
-                    if (r > 35 && r > g * 1.25 && r > b * 1.25) {
+                    if (r > 35 && r > imgData[index+1] * 1.25 && r > imgData[index+2] * 1.25) {
                         const posX = centerX + (x - scanSize / 2) * scale;
                         const posY = centerY + (y - scanSize / 2) * scale * 1.25;
-                        const colorString = `rgb(${r},${Math.max(0, g-25)},${Math.max(0, b-25)})`;
+                        const colorString = `rgb(${r},${Math.max(0, imgData[index+1]-25)},${Math.max(0, imgData[index+2]-25)})`;
                         particles.push(new Particle(posX, posY, textToDisplay, colorString));
                     }
                 }
@@ -205,122 +233,118 @@
 
         function drawAdvancedText(centerX, centerY, scaleFactor = 1, currentAlpha = 1) {
             ctx.save();
-            ctx.textAlign = 'center'; 
-            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.globalAlpha = currentAlpha;
             
-            // Мобільний розмір тексту трохи менший
             let baseFontSize = isMobile ? 36 : 46;
             let size = Math.floor(baseFontSize * scaleFactor);
             
             if (isPlaying && bassPower > 0.5) {
                 ctx.fillStyle = `rgba(255, 0, 50, ${bassPower * 0.35})`;
                 ctx.font = `italic bold ${size + Math.floor(20 * bassPower)}px sans-serif`;
-                ctx.shadowBlur = 25 * bassPower;
-                ctx.shadowColor = '#ff0033';
+                ctx.shadowBlur = 25 * bassPower; ctx.shadowColor = '#ff0033';
                 ctx.fillText('Love you.', centerX, centerY);
             }
             
-            ctx.shadowBlur = (15 * scaleFactor) | 0;
-            ctx.shadowColor = 'rgba(255, 0, 30, 0.8)';
-            ctx.fillStyle = '#ffffff';
-            ctx.font = `bold ${size}px sans-serif`;
-            ctx.letterSpacing = "2px"; 
+            ctx.shadowBlur = (15 * scaleFactor) | 0; ctx.shadowColor = 'rgba(255, 0, 30, 0.8)';
+            ctx.fillStyle = '#ffffff'; ctx.font = `bold ${size}px sans-serif`; ctx.letterSpacing = "2px"; 
             ctx.fillText('Love you.', centerX, centerY);
             ctx.restore();
         }
 
-        // АВТОМАТИЧНА ЗАСТАВКА: ВЕРТИКАЛЬНИЙ ПАДІННЯ МЕЧА
+        // ВЕРТИКАЛЬНЕ ІНТРО: ДЕТАЛІЗОВАНИЙ МЕЧ ВЛІТАЄ В ААНАТОМІЧНЕ СЕРЦЕ БЕЗ ІСКР
         function drawVerticalSwordIntro() {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // М'яка заміна силуету серця на фоні
-            ctx.save(); ctx.globalAlpha = 0.03;
-            let imgW = isMobile ? 220 : 300;
-            let imgH = isMobile ? 260 : 360;
+            // М'яка поява реального силуету твого серця з першої секунди
+            if (heartAlpha < 0.06) heartAlpha += 0.0015;
+            ctx.save();
+            ctx.globalAlpha = swordIn ? 0.09 : heartAlpha;
+            let imgW = isMobile ? 225 : 310; 
+            let imgH = isMobile ? 265 : 370;
             ctx.drawImage(heartImg, centerX - imgW/2, centerY - imgH/2, imgW, imgH);
             ctx.restore();
 
-            if (textAlpha < 1 && swordY < centerY - 150) {
-                textAlpha += 0.03;
-            }
-
+            if (textAlpha < 1 && swordY < centerY - 150) textAlpha += 0.03;
             drawAdvancedText(centerX, centerY, 1, textAlpha);
 
-            // Падіння строго вертикально вниз
+            // Фізика прискорення руху клинка
             if (swordY < targetSwordY) {
-                swordY += 15; // Швидке солідне падіння
+                swordY += swordSpeed;
+                swordSpeed += 0.9; 
             } else if (!swordIn) {
                 swordIn = true;
-                // Спалах іскр від зіткнення
-                let sparkCount = isMobile ? 25 : 50;
-                for(let i = 0; i < sparkCount; i++) {
-                    sparkParticles.push({
-                        x: centerX, y: centerY,
-                        vx: (Math.random() - 0.5) * 10,
-                        vy: (Math.random() - 0.5) * 10 - 2,
-                        size: Math.random() * 2.5 + 1,
-                        alpha: 1
-                    });
-                }
+                // Жодних іскр! Чистий, глибокий вхід меча в серце
                 startBtn.style.display = 'block';
                 setTimeout(() => { startBtn.style.opacity = '1'; }, 50);
             }
 
-            // Рендеринг іскр
+            // МАЛЮВАННЯ ВИСОКОДЕТАЛІЗОВАНОГО МЕЧА КОДОМ
             ctx.save();
-            ctx.shadowBlur = 10; ctx.shadowColor = '#ff0011';
-            for(let i = sparkParticles.length - 1; i >= 0; i--) {
-                let p = sparkParticles[i];
-                p.x += p.vx; p.y += p.vy; p.alpha -= 0.025;
-                if(p.alpha <= 0) { sparkParticles.splice(i, 1); continue; }
-                ctx.fillStyle = `rgba(255, 60, 60, ${p.alpha})`;
-                ctx.fillRect(p.x, p.y, p.size, p.size);
-            }
-            ctx.restore();
-
-            // МАЛЮВАННЯ ВЕРТИКАЛЬНОГО МЕЧА
-            ctx.save();
-            // Масштабуємо сам меч на мобільних телефонах, щоб не перекривав весь екран
             let swordScale = isMobile ? 0.75 : 1;
             ctx.translate(centerX, swordY);
             ctx.scale(swordScale, swordScale);
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = '#ff0022';
-
-            // Лезо
-            ctx.fillStyle = '#ffffff'; 
-            ctx.fillRect(-3, -190, 6, 190);
-            ctx.fillStyle = '#ff0033'; 
-            ctx.fillRect(-5, -190, 2, 190);
-            ctx.fillRect(3, -190, 2, 190);
-
-            // Хрестовина
-            ctx.fillStyle = '#ff0022';
-            ctx.fillRect(-35, -190, 70, 6);
             
-            // Рукоятка
+            // Насичений неоновий контур всього меча
+            ctx.shadowBlur = 20; 
+            ctx.shadowColor = '#ff0015';
+
+            // 1. ЛЕЗО З РЕЛЬЄФНИМ ГРАДІЄНТОМ ТА РЕБРОМ ЖОРСТКОСТІ (Ромбоподібне)
+            ctx.fillStyle = '#ff0033'; 
+            ctx.fillRect(-6, -190, 12, 190); // Базовий силует леза
+            ctx.fillStyle = '#ffffff'; 
+            ctx.fillRect(-2, -190, 4, 190); // Центральне яскраве біле ребро меча
+            ctx.fillStyle = '#990011';
+            ctx.fillRect(-6, -190, 2, 190); // Тіні на гранях
+            ctx.fillRect(4, -190, 2, 190);
+
+            // Вістря меча (гострий трикутник донизу)
+            ctx.beginPath();
+            ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.lineTo(0, 12);
+            ctx.closePath();
+            ctx.fillStyle = '#ff0033'; ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(-2, 0); ctx.lineTo(2, 0); ctx.lineTo(0, 12);
+            ctx.closePath();
+            ctx.fillStyle = '#ffffff'; ctx.fill();
+
+            // 2. ФІГУРНА ДЕТАЛІЗОВАНА ГАРДА (Хрестовина з гострими загнутими кутами)
+            ctx.fillStyle = '#ff0022';
+            ctx.fillRect(-38, -190, 76, 7); // Основа хрестовини
+            // Гострі бічні зубці гарди
+            ctx.fillRect(-38, -195, 6, 12);
+            ctx.fillRect(32, -195, 6, 12);
+
+            // 3. РУКОЯТКА ТА ОБ'ЄМНЕ НАВЕРШЯ (Повністю закрита брутальна форма)
+            ctx.fillStyle = '#ffffff'; 
+            ctx.fillRect(-3, -225, 6, 35); // Тіло рукоятки
+            ctx.fillStyle = '#ff0033';
+            ctx.fillRect(-4, -205, 8, 3);  // Декоративні кільця на ручці
+            ctx.fillRect(-4, -217, 8, 3);
+
+            // Навершя (Об'ємна гостра трапеція вгорі)
+            ctx.fillStyle = '#ff0022';
+            ctx.beginPath();
+            ctx.moveTo(-8, -225); ctx.lineTo(8, -225);
+            ctx.lineTo(12, -235); ctx.lineTo(-12, -235);
+            ctx.closePath();
+            ctx.fill();
             ctx.fillStyle = '#ffffff';
-            ctx.fillRect(-2, -225, 4, 35);
-            ctx.fillRect(-6, -233, 12, 8);
+            ctx.fillRect(-3, -233, 6, 6); // Біле ядро всередині навершя
 
             ctx.restore();
 
-            if (swordIn && !isPlaying) {
-                drawAdvancedText(centerX, centerY, 1, 0.85);
-            }
+            if (swordIn && !isPlaying) drawAdvancedText(centerX, centerY, 1, 0.85);
         }
 
         function handleBackgroundWaves() {
             if (bassPower > 0.65 && Math.random() > 0.75) {
                 audioWaves.push({ radius: 10, maxRadius: Math.min(canvas.width, canvas.height) * 0.85, opacity: 0.15 });
             }
-            ctx.lineWidth = 1.5;
-            ctx.strokeStyle = 'rgba(200, 0, 15, 0.15)';
+            ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(200, 0, 15, 0.15)';
             for (let i = audioWaves.length - 1; i >= 0; i--) {
-                let w = audioWaves[i];
-                w.radius += 4 + (bassPower * 5); w.opacity -= 0.003; 
+                let w = audioWaves[i]; w.radius += 4 + (bassPower * 5); w.opacity -= 0.003; 
                 if (w.opacity <= 0 || w.radius >= w.maxRadius) { audioWaves.splice(i, 1); continue; }
                 ctx.beginPath(); ctx.arc(centerX, centerY, w.radius, 0, Math.PI * 2); ctx.stroke();
             }
@@ -330,28 +354,25 @@
             if (!swordIn || (swordIn && !isPlaying)) {
                 drawVerticalSwordIntro();
             } else {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.22)'; 
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.22)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                if (analyser) {
+                if (analyser && !isMusicPaused) {
                     analyser.getByteFrequencyData(dataArray);
                     let bass = (dataArray[0] + dataArray[1] + dataArray[2]) / 3;
-                    bassPower = bass / 255; 
-                    beatScale = 1 + bassPower * 0.13; 
+                    bassPower = bass / 255; beatScale = 1 + bassPower * 0.13; 
+                } else if (isMusicPaused) {
+                    bassPower = 0; beatScale -= (beatScale - 1) * 0.1;
                 }
 
                 let gradient = ctx.createRadialGradient(centerX, centerY, 10, centerX, centerY, Math.min(canvas.width, canvas.height) * 0.55);
-                gradient.addColorStop(0, `rgba(55, 0, 5, ${bassPower * 0.15})`);
-                gradient.addColorStop(1, 'rgba(0,0,0,0)');
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                gradient.addColorStop(0, `rgba(55, 0, 5, ${bassPower * 0.15})`); gradient.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = gradient; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
                 handleBackgroundWaves();
 
                 const len = particles.length;
                 for (let i = 0; i < len; i++) {
-                    particles[i].update(centerX, centerY);
-                    particles[i].draw();
+                    particles[i].update(centerX, centerY); particles[i].draw();
                 }
 
                 drawAdvancedText(centerX, centerY, beatScale, 1);
@@ -365,7 +386,6 @@
         startBtn.addEventListener('click', () => {
             introScreen.style.opacity = '0';
             setTimeout(() => { introScreen.style.display = 'none'; }, 1000);
-            
             document.body.style.background = "radial-gradient(circle at center, #0e0002 0%, #030000 75%, #000000 100%)";
 
             audio.play().then(() => {
@@ -373,49 +393,23 @@
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                     let src = audioCtx.createMediaElementSource(audio);
                     analyser = audioCtx.createAnalyser();
-                    src.connect(analyser);
-                    analyser.connect(audioCtx.destination);
-                    analyser.fftSize = 64; 
-                    analyser.smoothingTimeConstant = 0.75; 
+                    src.connect(analyser); analyser.connect(audioCtx.destination);
+                    analyser.fftSize = 64; analyser.smoothingTimeConstant = 0.75; 
                     dataArray = new Uint8Array(analyser.frequencyBinCount);
                 }
             }).catch(e => console.log("Muted", e));
 
-            isPlaying = true;
+            isPlaying = true; isMusicPaused = false;
             scanHeartImage(); 
         });
 
-        // ПІДТРИМКА ТРИ КЛІКИ / ТРИ ТАПИ НА ТЕЛЕФОНІ
-        let clickCount = 0;
-        let clickTimer;
-        
-        const handleTripleInput = (e) => {
-            if (!isPlaying || e.target === startBtn) return;
-            clickCount++;
-            if (clickCount === 1) {
-                clickTimer = setTimeout(() => { clickCount = 0; }, 400); 
-            } else if (clickCount === 3) {
-                clearTimeout(clickTimer);
-                clickCount = 0;
-                resetToStrictStart();
-            }
-        };
-
-        window.addEventListener('click', handleTripleInput);
-
         function resetToStrictStart() {
-            isPlaying = false;
-            audio.pause();
-            audio.currentTime = 0;
-            audioWaves.length = 0;
+            isPlaying = false; isMusicPaused = false;
+            audio.pause(); audio.currentTime = 0; audioWaves.length = 0;
             
-            // Повне вертикальне скидання
-            swordY = -250;
-            swordIn = false;
-            textAlpha = 0;
-            sparkParticles = [];
-            startBtn.style.display = 'none';
-            startBtn.style.opacity = '0';
+            swordY = -350; swordSpeed = 3; swordIn = false;
+            textAlpha = 0; heartAlpha = 0;
+            startBtn.style.display = 'none'; startBtn.style.opacity = '0';
 
             document.body.style.background = "#000";
             introScreen.style.display = 'flex';
@@ -424,16 +418,11 @@
 
         window.addEventListener('resize', () => {
             isMobile = window.innerWidth < 768;
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            centerX = canvas.width / 2;
-            centerY = canvas.height / 2;
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            centerX = canvas.width / 2; centerY = canvas.height / 2;
             mouse.radius = isMobile ? 50 : 65;
-            if(!swordIn) {
-                swordX = centerX;
-                swordY = -250;
-            }
-            targetSwordY = centerY - 30;
+            if(!swordIn) { swordX = centerX; swordY = -350; swordSpeed = 3; }
+            targetSwordY = centerY - 25;
             if(isPlaying) scanHeartImage();
         });
     </script>
