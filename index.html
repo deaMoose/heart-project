@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DARK ROMANCE // DIE FOR YOU</title>
+    <title>DARK ROMANCE // ADVANCED INTERACTIVE</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -46,13 +46,62 @@
             letter-spacing: 5px;
             text-transform: uppercase;
             opacity: 0;
-            margin-top: 290px; /* Трохи нижче, щоб не перекривати ручку нахиленого меча */
+            margin-top: 290px;
         }
         #startBtn:hover { 
             transform: scale(1.03); 
             background: #ff0015;
             box-shadow: 0 0 45px #ff0015, inset 0 0 15px rgba(255,255,255,0.3);
         }
+
+        /* Стильне готичне меню плейлиста */
+        #playlistMenu {
+            display: none;
+            position: absolute;
+            background: rgba(5, 0, 2, 0.93);
+            border: 2px solid #ff0015;
+            padding: 25px;
+            width: 300px;
+            z-index: 100;
+            box-shadow: 0 0 35px rgba(255, 0, 21, 0.4);
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+        #playlistMenu h3 {
+            color: #fff;
+            font-size: 1.1rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 0, 21, 0.3);
+            padding-bottom: 10px;
+        }
+        .track-item {
+            padding: 12px;
+            color: #bbb;
+            background: rgba(20, 0, 3, 0.6);
+            border: 1px solid rgba(255, 0, 21, 0.15);
+            margin-bottom: 10px;
+            cursor: pointer;
+            font-weight: 500;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+        }
+        .track-item:hover, .track-item.active {
+            color: #fff;
+            background: rgba(180, 0, 15, 0.3);
+            border-color: #ff0015;
+            box-shadow: 0 0 15px rgba(255,0,21,0.2);
+        }
+        #closePlaylist {
+            position: absolute;
+            top: 5px; right: 10px;
+            color: rgba(255,255,255,0.5);
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+        #closePlaylist:hover { color: #ff0015; }
     </style>
 </head>
 <body>
@@ -61,6 +110,13 @@
     
     <div id="intro-screen">
         <button id="startBtn">Die For You</button>
+    </div>
+
+    <div id="playlistMenu">
+        <span id="closePlaylist">&times;</span>
+        <h3>Playlist</h3>
+        <div class="track-item active" data-src="die_for_you.mp3">1. Die For You</div>
+        <div class="track-item" data-src="angel.mp3">2. Angel</div>
     </div>
 
     <audio id="bgMusic" src="die_for_you.mp3" loop preload="auto"></audio>
@@ -73,6 +129,9 @@
         const introScreen = document.getElementById('intro-screen');
         const audio = document.getElementById('bgMusic');
         const heartImg = document.getElementById('heartImg');
+        const playlistMenu = document.getElementById('playlistMenu');
+        const closePlaylist = document.getElementById('closePlaylist');
+        const trackItems = document.querySelectorAll('.track-item');
 
         let isMobile = window.innerWidth < 768;
         canvas.width = window.innerWidth;
@@ -80,6 +139,7 @@
 
         const particles = [];
         const audioWaves = [];
+        const bloodDrops = []; // Масив для крапель крові, що стікають
         const textToDisplay = "love you";
         
         let audioCtx, analyser, dataArray, animationFrameId;
@@ -91,11 +151,10 @@
         let centerX = canvas.width / 2;
         let centerY = canvas.height / 2;
         
-        // Математика ДІАГОНАЛЬНОГО ПОЛІТУ (кут ~60 градусів)
+        // Діагональний політ меча
         const angle = Math.PI / 3; 
-        // Початкова точка далеко вгорі ліворуч
         let swordDist = -500; 
-        let targetDist = -40; // Точка зупинки, щоб лезо пройшло наскрізь через центр
+        let targetDist = -40; 
         let swordSpeed = 4; 
         
         let swordIn = false;
@@ -122,48 +181,98 @@
 
         window.addEventListener('touchend', (e) => {
             touchEndY = e.changedTouches[0].clientY;
-            if (!checkSwipeDown()) handleTripleClick(e);
+            if (!checkSwipeDown()) handleClicks(e);
         });
 
         window.addEventListener('mouseup', (e) => {
             touchEndY = e.clientY;
-            if (!checkSwipeDown()) handleTripleClick(e);
+            if (!checkSwipeDown()) handleClicks(e);
         });
 
         function checkSwipeDown() {
             if (!isPlaying) return false;
             if (touchEndY - touchStartY > 120) {
+                // Ховаємо плейлист, якщо він відкритий
+                playlistMenu.style.display = 'none';
                 resetToStrictStart();
                 return true;
             }
             return false;
         }
 
-        function handleTripleClick(e) {
-            if (!isPlaying || e.target === startBtn) return;
+        // ОНОВЛЕНЕ КЕРУВАННЯ: 2 КЛІКА — ПАУЗА, 3 КЛІКА — ПЛЕЙЛИСТ
+        function handleClicks(e) {
+            if (!isPlaying || e.target === startBtn || playlistMenu.contains(e.target)) return;
             clickCount++;
+            
             if (clickCount === 1) {
-                clickTimer = setTimeout(() => { clickCount = 0; }, 400); 
+                clickTimer = setTimeout(() => {
+                    clickCount = 0;
+                }, 400); // Вікно очікування комбінацій
+            } else if (clickCount === 2) {
+                // Чекаємо ще трохи, щоб перевірити, чи це не 3-й клік
+                setTimeout(() => {
+                    if (clickCount === 2) {
+                        clearTimeout(clickTimer);
+                        clickCount = 0;
+                        toggleMusicPause(); // 2 тапи -> Пауза / Плей
+                    }
+                }, 120);
             } else if (clickCount === 3) {
                 clearTimeout(clickTimer);
                 clickCount = 0;
-                if (isMusicPaused) {
-                    audio.play().catch(e => console.log(e));
-                    isMusicPaused = false;
-                } else {
-                    audio.pause();
-                    isMusicPaused = true;
-                }
+                togglePlaylistMenu(); // 3 тапи -> Меню плейлиста
             }
         }
+
+        function toggleMusicPause() {
+            if (isMusicPaused) {
+                audio.play().catch(e => console.log(e));
+                isMusicPaused = false;
+            } else {
+                audio.pause();
+                isMusicPaused = true;
+            }
+        }
+
+        function togglePlaylistMenu() {
+            if (playlistMenu.style.display === 'block') {
+                playlistMenu.style.opacity = '0';
+                setTimeout(() => { playlistMenu.style.display = 'none'; }, 400);
+            } else {
+                playlistMenu.style.display = 'block';
+                setTimeout(() => { playlistMenu.style.opacity = '1'; }, 10);
+            }
+        }
+
+        closePlaylist.addEventListener('click', () => {
+            playlistMenu.style.opacity = '0';
+            setTimeout(() => { playlistMenu.style.display = 'none'; }, 400);
+        });
+
+        // Логіка вибору треків у меню
+        trackItems.forEach(item => {
+            item.addEventListener('click', () => {
+                trackItems.forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                
+                audio.src = item.getAttribute('data-src');
+                isMusicPaused = false;
+                
+                // Перепідключаємо аудіопотік до аналізатора, якщо контекст створено
+                if (audioCtx) {
+                    audio.play().catch(e => console.log(e));
+                }
+                
+                togglePlaylistMenu(); // Ховаємо плейлист після вибору
+            });
+        });
 
         class Particle {
             constructor(x, y, text, color) {
                 this.x = Math.random() * canvas.width;
                 this.y = Math.random() * canvas.height;
-                this.baseX = x; 
-                this.baseY = y; 
-                this.text = text;
+                this.baseX = x; this.baseY = y; this.text = text;
                 this.density = (Math.random() * 8) + 12;
                 this.fontSize = ((Math.random() * 3 + (isMobile ? 7 : 8))) | 0;
                 this.color = color;
@@ -172,14 +281,11 @@
 
             draw() {
                 let finalColor = this.color;
-
                 if (mouse.x !== null) {
-                    let dx = mouse.x - this.x;
-                    let dy = mouse.y - this.y;
+                    let dx = mouse.x - this.x; let dy = mouse.y - this.y;
                     let rSq = isMobile ? 2500 : 4225;
                     if (dx*dx + dy*dy < rSq) this.flash = 12;
                 }
-
                 if (this.flash > 0) {
                     finalColor = `rgba(255, 200, 200, 0.8)`; 
                     ctx.shadowBlur = this.flash; ctx.shadowColor = '#ff3355';
@@ -187,17 +293,13 @@
                 } else if (bassPower > 0.4) {
                     ctx.shadowBlur = (8 * bassPower) | 0; ctx.shadowColor = '#ff0033';
                 }
-
-                ctx.fillStyle = finalColor;
-                ctx.font = `bold ${this.fontSize}px Arial`; 
-                ctx.fillText(this.text, this.x | 0, this.y | 0);
-                ctx.shadowBlur = 0;
+                ctx.fillStyle = finalColor; ctx.font = `bold ${this.fontSize}px Arial`; 
+                ctx.fillText(this.text, this.x | 0, this.y | 0); ctx.shadowBlur = 0;
             }
 
             update(centerX, centerY) {
                 let targetX = centerX + (this.baseX - centerX) * beatScale;
                 let targetY = centerY + (this.baseY - centerY) * beatScale;
-
                 this.x -= (this.x - targetX) / this.density;
                 this.y -= (this.y - targetY) / this.density;
             }
@@ -212,7 +314,6 @@
             
             tempCtx.drawImage(heartImg, 0, 0, scanSize, scanSize);
             const imgData = tempCtx.getImageData(0, 0, scanSize, scanSize).data;
-            
             const scale = Math.min(canvas.width, canvas.height) / scanSize * (isMobile ? 0.85 : 0.95);
             const step = isMobile ? 5 : 4; 
 
@@ -234,7 +335,6 @@
             ctx.save();
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.globalAlpha = currentAlpha;
-            
             let baseFontSize = isMobile ? 36 : 46;
             let size = Math.floor(baseFontSize * scaleFactor);
             
@@ -244,19 +344,15 @@
                 ctx.shadowBlur = 25 * bassPower; ctx.shadowColor = '#ff0033';
                 ctx.fillText('Love you.', centerX, centerY);
             }
-            
             ctx.shadowBlur = (15 * scaleFactor) | 0; ctx.shadowColor = 'rgba(255, 0, 30, 0.8)';
             ctx.fillStyle = '#ffffff'; ctx.font = `bold ${size}px sans-serif`; ctx.letterSpacing = "2px"; 
-            ctx.fillText('Love you.', centerX, centerY);
-            ctx.restore();
+            ctx.fillText('Love you.', centerX, centerY); ctx.restore();
         }
 
-        // НОВЕ ІНТРО: УЛ ТРА-ДЕТАЛІЗОВАНИЙ МЕЧ ПРОБИВАЄ НАПИС І СЕРЦЕ НАСКРІЗЬ
+        // ІНТРО ТА ЛОГІКА КРАПЕЛЬ «КРОВ ОТEЧІ» ВДОВЖ ЛЕЗА
         function drawDiagonalSwordIntro() {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Твоє реальне серце плавно горить на фоні з самого початку
             if (heartAlpha < 0.06) heartAlpha += 0.0015;
             ctx.save();
             ctx.globalAlpha = swordIn ? 0.09 : heartAlpha;
@@ -267,62 +363,73 @@
             if (textAlpha < 1 && swordDist < -150) textAlpha += 0.03;
             drawAdvancedText(centerX, centerY, 1, textAlpha);
 
-            // Розрахунок руху по діагоналі з прискоренням
             if (swordDist < targetDist) {
-                swordDist += swordSpeed;
-                swordSpeed += 0.8; 
+                swordDist += swordSpeed; swordSpeed += 0.8; 
             } else if (!swordIn) {
                 swordIn = true;
-                // Чистий глибокий наскрізний вхід без іскр
                 startBtn.style.display = 'block';
                 setTimeout(() => { startBtn.style.opacity = '1'; }, 50);
             }
 
-            // Поточні координати меча на векторі нахилу
             let currentX = centerX + swordDist * Math.cos(angle);
             let currentY = centerY + swordDist * Math.sin(angle);
 
-            // МАЛЮВАННЯ УЛЬТРА-ДЕТАЛІЗОВАНОГО МЕЧА ПІД КУТОМ
+            // ЕФЕКТ КРОВОТЕЧІ: Створення неонових крапель з місця виходу вістря
+            if (swordIn && Math.random() > 0.7) {
+                // Точка виходу вістря нижче центру літер вздовж осі меча
+                let woundX = centerX + (targetDist + 45) * Math.cos(angle);
+                let woundY = centerY + (targetDist + 45) * Math.sin(angle);
+                bloodDrops.push({
+                    x: woundX,
+                    y: woundY,
+                    vy: Math.random() * 2 + 1, // Швидкість падіння вниз
+                    vx: Math.cos(angle) * (Math.random() * 0.5), // Легке ковзання вздовж нахилу
+                    size: Math.random() * 2 + 1.5,
+                    alpha: 1
+                });
+            }
+
+            // Малювання та оновлення крапель
+            ctx.save(); ctx.shadowBlur = 8; ctx.shadowColor = '#ff0015';
+            for (let i = bloodDrops.length - 1; i >= 0; i--) {
+                let d = bloodDrops[i];
+                d.y += d.vy; d.x += d.vx;
+                d.alpha -= 0.003; // Повільно тануть донизу
+                if (d.alpha <= 0 || d.y > canvas.height) { bloodDrops.splice(i, 1); continue; }
+                ctx.fillStyle = `rgba(255, 10, 25, ${d.alpha})`;
+                ctx.beginPath();
+                ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+
+            // МАЛЮВАННЯ ДЕТАЛІЗОВАНОГО МЕЧА
             ctx.save();
             let swordScale = isMobile ? 0.75 : 1;
-            ctx.translate(currentX, currentY);
-            ctx.rotate(angle - Math.PI / 2); // Поворот за вектором руху
+            ctx.translate(currentX, currentY); ctx.rotate(angle - Math.PI / 2);
             ctx.scale(swordScale, swordScale);
             ctx.shadowBlur = 20; ctx.shadowColor = '#ff0015';
 
-            // 1. ДОВГЕ РОМБОПОДІБНЕ ЛЕЗО (Проходить наскрізь, довжина збільшена до 250px)
+            // Лезо з ребрами
             ctx.fillStyle = '#ff0033'; ctx.fillRect(-6, -210, 12, 250); 
-            ctx.fillStyle = '#ffffff'; ctx.fillRect(-1.5, -210, 3, 250); // Біле центральне ребро жорсткості
-            ctx.fillStyle = '#990011'; ctx.fillRect(-6, -210, 2, 250); // Грані тіні
-            ctx.fillRect(4, -210, 2, 250);
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(-1.5, -210, 3, 250); 
+            ctx.fillStyle = '#990011'; ctx.fillRect(-6, -210, 2, 250); ctx.fillRect(4, -210, 2, 250);
 
-            // Гостре довге вістрі клинка на кінці
-            ctx.beginPath();
-            ctx.moveTo(-6, 40); ctx.lineTo(6, 40); ctx.lineTo(0, 58);
-            ctx.closePath();
+            // Вістрі меча
+            ctx.beginPath(); ctx.moveTo(-6, 40); ctx.lineTo(6, 40); ctx.lineTo(0, 58); ctx.closePath();
             ctx.fillStyle = '#ff0033'; ctx.fill();
-            ctx.beginPath();
-            ctx.moveTo(-1.5, 40); ctx.lineTo(1.5, 40); ctx.lineTo(0, 58);
-            ctx.closePath();
+            ctx.beginPath(); ctx.moveTo(-1.5, 40); ctx.lineTo(1.5, 40); ctx.lineTo(0, 58); ctx.closePath();
             ctx.fillStyle = '#ffffff'; ctx.fill();
 
-            // 2. СКЛАДНА ГОТИЧНА ГАРДА (Хрестовина з рельєфом)
-            ctx.fillStyle = '#ff0022'; ctx.fillRect(-40, -210, 80, 8); 
-            ctx.fillRect(-40, -216, 6, 14); // Гострі кути гарди, направлені вперед
-            ctx.fillRect(34, -216, 6, 14);
+            // Гарда
+            ctx.fillStyle = '#ff0022'; ctx.fillRect(-40, -210, 80, 8); ctx.fillRect(-40, -216, 6, 14); ctx.fillRect(34, -216, 6, 14);
 
-            // 3. РУКОЯТКА ТА ТРАПЕЦІЄПОДІБНЕ НАВЕРШЯ
+            // Рукоятка
             ctx.fillStyle = '#ffffff'; ctx.fillRect(-3, -248, 6, 38); 
-            ctx.fillStyle = '#ff0033';
-            ctx.fillRect(-4.5, -225, 9, 3); // Кільця обхвату
-            ctx.fillRect(-4.5, -238, 9, 3);
+            ctx.fillStyle = '#ff0033'; ctx.fillRect(-4.5, -225, 9, 3); ctx.fillRect(-4.5, -238, 9, 3);
 
-            // Навершя (Масивне гостре закінчення меча)
-            ctx.fillStyle = '#ff0022';
-            ctx.beginPath();
-            ctx.moveTo(-9, -248); ctx.lineTo(9, -248);
-            ctx.lineTo(14, -260); ctx.lineTo(-14, -260);
-            ctx.closePath(); ctx.fill();
+            // Навершя
+            ctx.fillStyle = '#ff0022'; ctx.beginPath(); ctx.moveTo(-9, -248); ctx.lineTo(9, -248); ctx.lineTo(14, -260); ctx.lineTo(-14, -260); ctx.closePath(); ctx.fill();
             ctx.fillStyle = '#ffffff'; ctx.fillRect(-3, -257, 6, 6);
 
             ctx.restore();
@@ -362,6 +469,16 @@
 
                 handleBackgroundWaves();
 
+                // Промальовуємо краплі навіть під час біту серця
+                ctx.save(); ctx.shadowBlur = 6; ctx.shadowColor = '#ff0015';
+                for (let i = bloodDrops.length - 1; i >= 0; i--) {
+                    let d = bloodDrops[i]; d.y += d.vy; d.x += d.vx; d.alpha -= 0.004;
+                    if (d.alpha <= 0) { bloodDrops.splice(i, 1); continue; }
+                    ctx.fillStyle = `rgba(255, 15, 30, ${d.alpha})`;
+                    ctx.beginPath(); ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.restore();
+
                 const len = particles.length;
                 for (let i = 0; i < len; i++) {
                     particles[i].update(centerX, centerY); particles[i].draw();
@@ -397,7 +514,7 @@
 
         function resetToStrictStart() {
             isPlaying = false; isMusicPaused = false;
-            audio.pause(); audio.currentTime = 0; audioWaves.length = 0;
+            audio.pause(); audio.currentTime = 0; audioWaves.length = 0; bloodDrops.length = 0;
             
             swordDist = -500; swordSpeed = 4; swordIn = false;
             textAlpha = 0; heartAlpha = 0;
